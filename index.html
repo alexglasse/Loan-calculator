@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mortgage → Bitcoin & STRC ROI Calculator</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0d0d0d;
+    --surface: #161616;
+    --surface2: #1f1f1f;
+    --border: rgba(255,255,255,0.08);
+    --border2: rgba(255,255,255,0.14);
+    --text: #f0ede8;
+    --muted: #888;
+    --hint: #555;
+    --btc: #F7931A;
+    --strc: #1D9E75;
+    --pos: #3ecf8e;
+    --neg: #f87171;
+    --gold: #DFAF40;
+    --orange-dark: #D45015;
+    --font: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    --mono: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
+    --radius: 10px;
+    --radius-lg: 14px;
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font);
+    font-size: 15px;
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  .page {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 2.5rem 1.5rem 4rem;
+  }
+
+  header {
+    margin-bottom: 2.5rem;
+    border-bottom: 0.5px solid var(--border);
+    padding-bottom: 1.5rem;
+  }
+
+  .brand {
+    font-size: 11px;
+    letter-spacing: .12em;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 0.5rem;
+  }
+
+  h1 {
+    font-size: clamp(1.4rem, 4vw, 2rem);
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+    color: var(--text);
+    margin-bottom: 0.5rem;
+  }
+
+  h1 span { color: var(--btc); }
+
+  .subtitle {
+    font-size: 14px;
+    color: var(--muted);
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.5rem;
+    margin-bottom: 2rem;
+  }
+
+  @media (max-width: 640px) {
+    .grid { grid-template-columns: 1fr; }
+  }
+
+  .panel {
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 1.25rem 1.25rem 1rem;
+  }
+
+  .eyebrow {
+    font-size: 10px;
+    letter-spacing: .1em;
+    color: var(--hint);
+    text-transform: uppercase;
+    margin-bottom: 1rem;
+  }
+
+  .slr {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+
+  .slr label {
+    font-size: 13px;
+    color: var(--muted);
+    min-width: 108px;
+    flex-shrink: 0;
+  }
+
+  .slr input[type=range] {
+    flex: 1;
+    -webkit-appearance: none;
+    appearance: none;
+    height: 4px;
+    border-radius: 2px;
+    background: var(--surface2);
+    outline: none;
+    cursor: pointer;
+  }
+
+  .slr input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--text);
+    cursor: pointer;
+    border: none;
+    transition: transform .1s;
+  }
+
+  .slr input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+
+  .slr .sv {
+    font-size: 13px;
+    font-weight: 500;
+    min-width: 62px;
+    text-align: right;
+    font-family: var(--mono);
+    color: var(--text);
+  }
+
+  .hr { border: none; border-top: 0.5px solid var(--border); margin: 1rem 0; }
+
+  .alloc-bar {
+    display: flex;
+    margin: 0 0 4px 118px;
+    height: 5px;
+    border-radius: 3px;
+    overflow: hidden;
+  }
+
+  .alloc-labels {
+    display: flex;
+    justify-content: space-between;
+    margin-left: 118px;
+    font-size: 11px;
+    color: var(--hint);
+    margin-bottom: 2px;
+  }
+
+  .seg {
+    display: flex;
+    gap: 6px;
+    margin-top: 0.75rem;
+  }
+
+  .seg button {
+    flex: 1;
+    padding: 7px 0;
+    font-size: 12px;
+    font-family: var(--font);
+    border: 0.5px solid var(--border2);
+    border-radius: var(--radius);
+    cursor: pointer;
+    background: transparent;
+    color: var(--muted);
+    transition: background .15s, color .15s;
+  }
+
+  .seg button:hover { background: var(--surface2); color: var(--text); }
+  .seg button.on {
+    background: var(--surface2);
+    color: var(--text);
+    font-weight: 500;
+    border-color: rgba(255,255,255,0.22);
+  }
+
+  .metrics {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
+  .metrics3 {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
+  .mc {
+    background: var(--surface2);
+    border-radius: var(--radius);
+    padding: 10px 12px;
+  }
+
+  .ml {
+    font-size: 11px;
+    color: var(--hint);
+    margin-bottom: 4px;
+    letter-spacing: .03em;
+  }
+
+  .mv {
+    font-size: 17px;
+    font-weight: 500;
+    font-family: var(--mono);
+    color: var(--text);
+  }
+
+  .mv.sm { font-size: 14px; }
+  .pos { color: var(--pos); }
+  .neg { color: var(--neg); }
+
+  .breakdown {
+    background: var(--surface2);
+    border-radius: var(--radius);
+    padding: 10px 12px;
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .breakdown-label {
+    font-size: 11px;
+    color: var(--hint);
+    margin-bottom: 6px;
+    width: 100%;
+  }
+
+  .dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: 5px;
+  }
+
+  .bd-item {
+    display: flex;
+    align-items: center;
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  .bd-item b {
+    color: var(--text);
+    font-weight: 500;
+    font-family: var(--mono);
+    margin-left: 4px;
+  }
+
+  .chart-section {
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 1.25rem;
+    margin-bottom: 2rem;
+  }
+
+  .chart-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .legend {
+    display: flex;
+    gap: 14px;
+    flex-wrap: wrap;
+    font-size: 12px;
+    color: var(--muted);
+  }
+
+  .legend span {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .leg-line {
+    width: 18px;
+    height: 2px;
+    border-radius: 1px;
+    display: inline-block;
+  }
+
+  .leg-dash {
+    width: 18px;
+    height: 0;
+    border-top: 2px dashed #555;
+    display: inline-block;
+  }
+
+  .chart-wrap {
+    position: relative;
+    width: 100%;
+    height: 280px;
+  }
+
+  .disclaimer {
+    font-size: 12px;
+    color: var(--hint);
+    line-height: 1.6;
+    border-top: 0.5px solid var(--border);
+    padding-top: 1.5rem;
+  }
+
+  .disclaimer strong { color: var(--muted); font-weight: 500; }
+
+  footer {
+    margin-top: 3rem;
+    padding-top: 1.5rem;
+    border-top: 0.5px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: gap;
+    font-size: 12px;
+    color: var(--hint);
+  }
+
+  footer a {
+    color: var(--muted);
+    text-decoration: none;
+  }
+
+  footer a:hover { color: var(--text); }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header>
+    <p class="brand">Alex Glasse · Invest, Don't Impress</p>
+    <h1>Mortgage → <span>Bitcoin</span> & STRC<br>ROI Calculator</h1>
+    <p class="subtitle">Model the returns from borrowing capital and allocating to BTC and STRC (11.5% yield)</p>
+  </header>
+
+  <div class="grid">
+
+    <div class="panel">
+      <p class="eyebrow">Mortgage</p>
+
+      <div class="slr">
+        <label>Loan amount</label>
+        <input type="range" id="sP" min="25000" max="500000" step="5000" value="200000">
+        <span class="sv" id="vP">£200,000</span>
+      </div>
+      <div class="slr">
+        <label>Interest rate</label>
+        <input type="range" id="sR" min="1" max="10" step="0.25" value="4.5">
+        <span class="sv" id="vR">4.50%</span>
+      </div>
+      <div class="slr">
+        <label>Term</label>
+        <input type="range" id="sT" min="5" max="30" step="1" value="25">
+        <span class="sv" id="vT">25 yrs</span>
+      </div>
+
+      <div class="hr"></div>
+      <p class="eyebrow">Allocation — BTC vs STRC</p>
+
+      <div class="slr">
+        <label>BTC</label>
+        <input type="range" id="sB" min="0" max="100" step="5" value="50">
+        <span class="sv" id="vB">50%</span>
+      </div>
+      <div class="alloc-bar">
+        <div id="barS" style="background:#1D9E75;width:50%;transition:width .1s;"></div>
+        <div id="barB" style="background:#F7931A;flex:1;transition:all .1s;"></div>
+      </div>
+      <div class="alloc-labels">
+        <span id="lS">50% STRC</span>
+        <span id="lB">50% BTC</span>
+      </div>
+
+      <div class="hr"></div>
+      <p class="eyebrow" style="margin-bottom:6px;">BTC return assumption (main metrics)</p>
+      <div class="seg">
+        <button onclick="sa(this)" data-v="0.20">20% ARR</button>
+        <button onclick="sa(this)" data-v="0.30" class="on">30% ARR</button>
+        <button onclick="sa(this)" data-v="0.40">40% ARR</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <p class="eyebrow">Results at term end</p>
+
+      <div class="metrics">
+        <div class="mc">
+          <p class="ml">Portfolio value</p>
+          <p class="mv pos" id="mPV">—</p>
+        </div>
+        <div class="mc">
+          <p class="ml">Net profit</p>
+          <p class="mv" id="mNP">—</p>
+        </div>
+        <div class="mc">
+          <p class="ml">ROI on cost</p>
+          <p class="mv" id="mRO">—</p>
+        </div>
+        <div class="mc">
+          <p class="ml">Breakeven year</p>
+          <p class="mv" id="mBE">—</p>
+        </div>
+      </div>
+
+      <div class="metrics3">
+        <div class="mc">
+          <p class="ml">Monthly payment</p>
+          <p class="mv sm" id="mMP">—</p>
+        </div>
+        <div class="mc">
+          <p class="ml">Total repaid</p>
+          <p class="mv sm" id="mTR">—</p>
+        </div>
+        <div class="mc">
+          <p class="ml">Interest paid</p>
+          <p class="mv sm" id="mIP">—</p>
+        </div>
+      </div>
+
+      <div class="breakdown">
+        <p class="breakdown-label">Portfolio breakdown at term end</p>
+        <div class="bd-item">
+          <span class="dot" style="background:#F7931A;"></span>BTC: <b id="bBTC">—</b>
+        </div>
+        <div class="bd-item">
+          <span class="dot" style="background:#1D9E75;"></span>STRC: <b id="bSTRC">—</b>
+        </div>
+        <div class="bd-item" style="margin-left:auto;">
+          <span style="font-size:11px;color:var(--hint);">STRC yield 11.5% compounded</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="chart-section">
+    <div class="chart-header">
+      <p class="eyebrow" style="margin:0;">Portfolio value vs total mortgage repaid — year by year</p>
+      <div class="legend">
+        <span><span class="leg-line" style="background:#DFAF40;"></span>BTC 20% ARR</span>
+        <span><span class="leg-line" style="background:#F7931A;"></span>BTC 30% ARR</span>
+        <span><span class="leg-line" style="background:#D45015;"></span>BTC 40% ARR</span>
+        <span><span class="leg-dash"></span>Total repaid</span>
+      </div>
+    </div>
+    <div class="chart-wrap">
+      <canvas id="ch"></canvas>
+    </div>
+  </div>
+
+  <div class="disclaimer">
+    <strong>Important:</strong> This calculator is for illustrative purposes only and does not constitute financial advice. Bitcoin returns are modelled as smooth annual growth — real-world returns are volatile and unpredictable. STRC yield is assumed to compound annually and may change. Past performance is not indicative of future results. Always do your own research before making any investment or borrowing decisions. Alex Glasse is not a financial adviser.
+  </div>
+
+  <footer>
+    <span>alexglasse.com · Invest, Don't Impress</span>
+    <span>Not financial advice</span>
+  </footer>
+
+</div>
+
+<script>
+let arr = 0.30, chart = null;
+
+function gf(n) {
+  return '£' + Math.round(Math.abs(n)).toLocaleString('en-GB');
+}
+
+function mp(P, r, y) {
+  const rm = r / 12, n = y * 12;
+  if (rm === 0) return P / n;
+  return P * (rm * Math.pow(1 + rm, n)) / (Math.pow(1 + rm, n) - 1);
+}
+
+function ser(P, r, y, btc, bArr) {
+  const m = mp(P, r, y);
+  const strc = 1 - btc;
+  const out = [];
+  for (let i = 0; i <= y; i++) {
+    const bv = P * btc * Math.pow(1 + bArr, i);
+    const sv = P * strc * Math.pow(1.115, i);
+    out.push({ pv: Math.round(bv + sv), bv: Math.round(bv), sv: Math.round(sv), cm: Math.round(m * 12 * i) });
+  }
+  return out;
+}
+
+function upd() {
+  const P = +document.getElementById('sP').value;
+  const r = +document.getElementById('sR').value / 100;
+  const t = +document.getElementById('sT').value;
+  const btc = +document.getElementById('sB').value / 100;
+  const strc = 1 - btc;
+
+  document.getElementById('vP').textContent = '£' + P.toLocaleString('en-GB');
+  document.getElementById('vR').textContent = (r * 100).toFixed(2) + '%';
+  document.getElementById('vT').textContent = t + ' yrs';
+  document.getElementById('vB').textContent = Math.round(btc * 100) + '%';
+  document.getElementById('barS').style.width = (strc * 100) + '%';
+  document.getElementById('lB').textContent = Math.round(btc * 100) + '% BTC';
+  document.getElementById('lS').textContent = Math.round(strc * 100) + '% STRC';
+
+  const m = mp(P, r, t);
+  const total = Math.round(m * 12 * t);
+  const interest = total - P;
+
+  const s = ser(P, r, t, btc, arr);
+  const last = s[s.length - 1];
+  const np = last.pv - total;
+  const roi = total > 0 ? (np / total) * 100 : 0;
+
+  let be = 'N/A';
+  for (let i = 1; i < s.length; i++) {
+    if (s[i].pv >= s[i].cm) { be = 'Year ' + i; break; }
+  }
+
+  document.getElementById('mPV').textContent = gf(last.pv);
+  const ne = document.getElementById('mNP');
+  ne.textContent = (np >= 0 ? '+' : '-') + gf(np);
+  ne.className = 'mv ' + (np >= 0 ? 'pos' : 'neg');
+  const re = document.getElementById('mRO');
+  re.textContent = (roi >= 0 ? '+' : '') + roi.toFixed(1) + '%';
+  re.className = 'mv ' + (roi >= 0 ? 'pos' : 'neg');
+  document.getElementById('mBE').textContent = be;
+  document.getElementById('mMP').textContent = gf(m);
+  document.getElementById('mTR').textContent = gf(total);
+  document.getElementById('mIP').textContent = gf(interest);
+  document.getElementById('bBTC').textContent = gf(last.bv);
+  document.getElementById('bSTRC').textContent = gf(last.sv);
+
+  const s20 = ser(P, r, t, btc, 0.20);
+  const s30 = ser(P, r, t, btc, 0.30);
+  const s40 = ser(P, r, t, btc, 0.40);
+
+  chart.data.labels = s20.map((_, i) => 'Yr ' + i);
+  chart.data.datasets[0].data = s20.map(d => d.pv);
+  chart.data.datasets[1].data = s30.map(d => d.pv);
+  chart.data.datasets[2].data = s40.map(d => d.pv);
+  chart.data.datasets[3].data = s20.map(d => d.cm);
+  chart.update('none');
+}
+
+function sa(btn) {
+  document.querySelectorAll('.seg button').forEach(b => b.classList.remove('on'));
+  btn.classList.add('on');
+  arr = +btn.dataset.v;
+  upd();
+}
+
+['sP', 'sR', 'sT', 'sB'].forEach(id => {
+  document.getElementById(id).addEventListener('input', upd);
+});
+
+const ctx = document.getElementById('ch').getContext('2d');
+chart = new Chart(ctx, {
+  type: 'line',
+  data: {
+    labels: [],
+    datasets: [
+      { data: [], borderColor: '#DFAF40', borderWidth: 2, pointRadius: 0, fill: false, tension: 0.3 },
+      { data: [], borderColor: '#F7931A', borderWidth: 2.5, pointRadius: 0, fill: false, tension: 0.3 },
+      { data: [], borderColor: '#D45015', borderWidth: 2, pointRadius: 0, fill: false, tension: 0.3 },
+      { data: [], borderColor: '#555', borderWidth: 1.5, borderDash: [5, 4], pointRadius: 0, fill: false, tension: 0 }
+    ]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    interaction: { mode: 'index', intersect: false },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        backgroundColor: '#1f1f1f',
+        borderColor: 'rgba(255,255,255,0.1)',
+        borderWidth: 1,
+        titleColor: '#f0ede8',
+        bodyColor: '#888',
+        padding: 10,
+        callbacks: {
+          title: items => items[0].label,
+          label: ctx => {
+            const n = ['BTC 20% ARR', 'BTC 30% ARR', 'BTC 40% ARR', 'Total repaid'][ctx.datasetIndex];
+            return ' ' + n + ': £' + ctx.raw.toLocaleString('en-GB');
+          }
+        }
+      }
+    },
+    scales: {
+      y: {
+        ticks: {
+          color: '#555',
+          font: { size: 11 },
+          callback: v => v >= 1000000 ? '£' + (v / 1000000).toFixed(1) + 'm' : '£' + (v / 1000).toFixed(0) + 'k'
+        },
+        grid: { color: 'rgba(255,255,255,0.04)' },
+        border: { color: 'transparent' }
+      },
+      x: {
+        ticks: { autoSkip: true, maxTicksLimit: 8, color: '#555', font: { size: 11 } },
+        grid: { display: false },
+        border: { color: 'transparent' }
+      }
+    }
+  }
+});
+
+upd();
+</script>
+</body>
+</html>
